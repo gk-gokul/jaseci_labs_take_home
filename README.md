@@ -6,30 +6,11 @@ The whole thing runs locally with open-source models through Ollama. No paid API
 
 ---
 
-## Quick answer to the requirements
 
-Going through the assignment checklist to show what's covered.
 
-| Requirement | Where it lives |
-|---|---|
-| 1. Document intake (PDFs, images, text) | `ingest_1.py` handles all three |
-| 2. Field extraction with confidence + reason | `tools_3.py` consolidates, `output_format.py` serializes |
-| 3. Cross-document consistency + educated guess | `consolidate_field` in `tools_3.py` |
-| 3. Duplicate handling | `reconcile_same_type_docs` in `tools_3.py` |
-| 4. Status decision (complete / incomplete / needs_review) | `decide_status` in `tools_3.py` |
-| 5. Multi-turn processing | `replies_5.py` parses reply, `agent.py` re-runs tools |
-| 6. Interactive mode | Option 3 in `main.py` menu |
-| 7. Conditional tool usage | `agent.py` — LLM picks next tool each iteration |
-| 8. Claim prioritization | `prioritize` in `main.py` |
-| 9. Output format | `output_format.py` produces the exact schema |
-| Open-source LLM bonus | qwen2.5vl and qwen3:8b via Ollama |
-| AI usage logs | `ai_usage/` folder |
+## Stacks
 
----
-
-## How to run
-
-### Before you start
+### The stack I used to run this AI-Agent
 - Python 3.10 or newer
 - [Ollama](https://ollama.ai) installed and running
 - Pull the two models:
