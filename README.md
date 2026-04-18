@@ -372,18 +372,13 @@ Currently each document gets its own extraction call. A claim-level prompt that 
 
 ---
 
-## How I used AI to build this
+## How I used AI
 
-I worked with Claude throughout. Full logs are in `ai_usage/`. The important moments were:
+I used Claude in a targeted way with small, task-specific prompts rather than long conversational threads. The full chat history is available here: [ai_usage/](https://claude.ai/share/9d336e0f-e4a1-46dc-8ab7-0a88f0ef61cd)
 
-- **Analyzing the test data before writing code.** We walked through each claim together to figure out what failure mode it was testing. That shaped the whole data model — specifically the three-tier authority system, the `customer_confirmed` flag, and the decision to track promised documents separately from missing ones.
+My approach was to define each module clearly (ingestion, state, tools, messaging, agent) and generate them with focused prompts that specified inputs, outputs, and constraints. Prompts were kept minimal and structured to return predictable outputs, usually in a single pass.
 
-- **Testing qwen2.5vl before committing to it.** Before writing the ingestion pipeline, I ran the hardest documents through the model manually — the strikethrough VIN on CLM-001's adjuster note, the redaction blob on CLM-004's police report, the truncated VIN on CLM-004. It handled them all. That's why there's no Tesseract fallback.
+I avoided large, open-ended prompts and instead broke the system into smaller components, which made it easier to control behavior and reduce iteration. Most prompts were designed to produce code or structured JSON directly, so there was little need for follow-up refinement.
 
-- **Pushing back on over-architecture.** Claude initially suggested a full free-form ReAct-style agent loop with a big tool registry. I pushed back — for 5 claims and 5 tools, a simpler tool-picker with a closed enum is more reliable and easier to defend in an interview. We landed on the current design.
-
-- **Catching a real bug on CLM-003.** The first version of the conflict resolver picked the police report's OCR-corrupted 16-character VIN as the recommended value, because police report had highest authority for VIN. Claude and I worked out that authority ranking shouldn't override format validity — you filter out invalid candidates first, then rank. That fix is in `consolidate_field`.
-
-- **Prompt iteration.** Every LLM prompt went through 3–4 rounds. The drafter prompt originally leaked VIN advice into emails where VINs weren't an issue. The parser originally hallucinated approximations from other claims. Both got tightened through test-and-fix cycles you can see in the logs.
-
+Claude was primarily used to accelerate implementation once the structure was clear. The overall architecture, data model, and decision logic were defined upfront and then implemented with targeted assistance.
 The architecture decisions and the hard calls are mine. Claude was my sounding board and a fast typist when I was already sure what I wanted.
