@@ -1,0 +1,24 @@
+{
+  "processing_order": [
+    {
+      "claim_id": "CLM-001",
+      "reason": "ready to finalize \u2014 all documents present and consistent"
+    },
+    {
+      "claim_id": "CLM-003",
+      "reason": "needs human reviewer \u2014 unresolved conflict(s) in: ['vin']"
+    },
+    {
+      "claim_id": "CLM-005",
+      "reason": "waiting on customer outreach \u2014 missing required document(s): finance_agreement"
+    },
+    {
+      "claim_id": "CLM-002",
+      "reason": "waiting on customer (already acknowledged) \u2014 missing required document(s): police_report"
+    },
+    {
+      "claim_id": "CLM-004",
+      "reason": "waiting on internal appraisal \u2014 invalid field(s) require human review: ['vin']"
+    }
+  ]
+}

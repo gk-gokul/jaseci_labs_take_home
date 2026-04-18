@@ -1,0 +1,89 @@
+{
+  "claim_id": "CLM-003",
+  "status": "needs_review",
+  "extracted_fields": {
+    "vin": {
+      "value": "2T1BURHE5JC034127",
+      "confidence": "medium",
+      "source": "finance_agreement.pdf",
+      "reason": "conflict detected; filtered to format-valid candidates, then chose highest-authority source. agree: ['settlement_breakdown_v2.pdf']. disagree: ['finance_agreement.pdf=2T1BURHE5JC034182', 'police_report.png=2T1BURH5JC034127']"
+    },
+    "date_of_loss": {
+      "value": "2026-03-05",
+      "confidence": "high",
+      "source": "police_report.png",
+      "reason": "2 authoritative source(s) agree (total sources: 2)"
+    },
+    "insurance_payout": {
+      "value": 23800.0,
+      "confidence": "medium",
+      "source": "settlement_breakdown_v2.pdf",
+      "reason": "1 authoritative source(s) agree (total sources: 1)"
+    },
+    "loan_balance": {
+      "value": 27650.0,
+      "confidence": "high",
+      "source": "finance_agreement.pdf",
+      "reason": "2 authoritative source(s) agree (total sources: 2)"
+    }
+  },
+  "documents": {
+    "identified": [
+      {
+        "file": "finance_agreement.pdf",
+        "type": "finance_agreement",
+        "authority": "authoritative"
+      },
+      {
+        "file": "police_report.png",
+        "type": "police_report",
+        "authority": "authoritative"
+      },
+      {
+        "file": "settlement_breakdown_v2.pdf",
+        "type": "settlement_breakdown",
+        "authority": "authoritative"
+      }
+    ],
+    "missing": [],
+    "duplicates": [],
+    "superseded": [
+      "settlement_breakdown.pdf"
+    ]
+  },
+  "issues": [
+    {
+      "type": "revision",
+      "description": "settlement_breakdown was revised; using the revised version",
+      "details": "kept: settlement_breakdown_v2.pdf, superseded: ['settlement_breakdown.pdf']",
+      "resolution": "using values from settlement_breakdown_v2.pdf"
+    },
+    {
+      "type": "inconsistency",
+      "description": "vin values differ across documents",
+      "details": "values: ['2T1BURHE5JC034182', '2T1BURH5JC034127', '2T1BURHE5JC034127']",
+      "field": "vin",
+      "recommended_value": "2T1BURHE5JC034127",
+      "resolution": "chose value reported by settlement_breakdown_v2.pdf based on field authority"
+    }
+  ],
+  "next_action": {
+    "type": "escalate",
+    "message": null,
+    "reason": "unresolved conflict(s) in: ['vin']"
+  },
+  "pending_customer_questions": [],
+  "tools_used": [
+    {
+      "tool": "escalate_to_human",
+      "reason": "The current action is escalate and escalating to human is required for unresolved VIN conflicts.",
+      "result": "escalated due to conflicts in: ['vin']"
+    },
+    {
+      "tool": "done",
+      "reason": "Escalate_to_human has been called, and no further actions are required for the current state.",
+      "result": "agent ended loop"
+    }
+  ],
+  "turn_history": []
+}

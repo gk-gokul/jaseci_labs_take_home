@@ -1,0 +1,77 @@
+{
+  "claim_id": "CLM-001",
+  "status": "complete",
+  "extracted_fields": {
+    "vin": {
+      "value": "1HGCM82633A004352",
+      "confidence": "high",
+      "source": "finance_agreement.png",
+      "reason": "3 authoritative source(s) agree (total sources: 4)"
+    },
+    "date_of_loss": {
+      "value": "2026-02-14",
+      "confidence": "high",
+      "source": "police_report.pdf",
+      "reason": "2 authoritative source(s) agree (total sources: 3)"
+    },
+    "insurance_payout": {
+      "value": 18750.0,
+      "confidence": "medium",
+      "source": "settlement_breakdown.pdf",
+      "reason": "1 authoritative source(s) agree (total sources: 1)"
+    },
+    "loan_balance": {
+      "value": 22340.55,
+      "confidence": "high",
+      "source": "finance_agreement.png",
+      "reason": "2 authoritative source(s) agree (total sources: 3)"
+    }
+  },
+  "documents": {
+    "identified": [
+      {
+        "file": "adjuster_note.png",
+        "type": "adjuster_note",
+        "authority": "supporting"
+      },
+      {
+        "file": "finance_agreement.png",
+        "type": "finance_agreement",
+        "authority": "authoritative"
+      },
+      {
+        "file": "police_report.pdf",
+        "type": "police_report",
+        "authority": "authoritative"
+      },
+      {
+        "file": "settlement_breakdown.pdf",
+        "type": "settlement_breakdown",
+        "authority": "authoritative"
+      }
+    ],
+    "missing": [],
+    "duplicates": [],
+    "superseded": []
+  },
+  "issues": [],
+  "next_action": {
+    "type": "finalize",
+    "message": null,
+    "reason": "all required documents present and all fields resolved"
+  },
+  "pending_customer_questions": [],
+  "tools_used": [
+    {
+      "tool": "finalize_claim",
+      "reason": "the current action is finalize and the claim status is complete with all required documents present",
+      "result": "claim marked ready to finalize"
+    },
+    {
+      "tool": "done",
+      "reason": "finalize_claim has been called and the claim is marked as complete with no further actions required.",
+      "result": "agent ended loop"
+    }
+  ],
+  "turn_history": []
+}

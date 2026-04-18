@@ -1,0 +1,95 @@
+{
+  "claim_id": "CLM-005",
+  "status": "incomplete",
+  "extracted_fields": {
+    "vin": {
+      "value": "1N4AL3AP8JC231504",
+      "confidence": "high",
+      "source": "police_report.png",
+      "reason": "2 authoritative source(s) agree (total sources: 2)"
+    },
+    "date_of_loss": {
+      "value": "2026-03-22",
+      "confidence": "high",
+      "source": "police_report.png",
+      "reason": "conflict detected; chose value from highest-authority source. agree: ['police_report.png']. disagree: ['settlement_breakdown.pdf=2026-03-28'] | customer confirmed: 2026-03-22"
+    },
+    "insurance_payout": {
+      "value": 31500.0,
+      "confidence": "medium",
+      "source": "settlement_breakdown.pdf",
+      "reason": "1 authoritative source(s) agree (total sources: 1)"
+    },
+    "loan_balance": {
+      "value": 35120.75,
+      "confidence": "medium",
+      "source": "settlement_breakdown.pdf",
+      "reason": "1 authoritative source(s) agree (total sources: 2)"
+    }
+  },
+  "documents": {
+    "identified": [
+      {
+        "file": "customer_reply.txt",
+        "type": "customer_reply",
+        "authority": "customer_reply"
+      },
+      {
+        "file": "police_report.png",
+        "type": "police_report",
+        "authority": "authoritative"
+      },
+      {
+        "file": "settlement_breakdown.pdf",
+        "type": "settlement_breakdown",
+        "authority": "authoritative"
+      }
+    ],
+    "missing": [
+      "finance_agreement"
+    ],
+    "duplicates": [],
+    "superseded": []
+  },
+  "issues": [
+    {
+      "type": "missing",
+      "description": "required document not provided: finance_agreement"
+    },
+    {
+      "type": "inconsistency",
+      "description": "date_of_loss values differ across documents",
+      "details": "values: ['2026-03-22', '2026-03-28']",
+      "field": "date_of_loss",
+      "recommended_value": "2026-03-22",
+      "resolution": "chose value reported by police_report.png based on field authority | customer confirmed value: 2026-03-22",
+      "customer_confirmed": true
+    }
+  ],
+  "next_action": {
+    "type": "message_customer",
+    "message": "Hi Elena,  \n\nThanks for sharing the updated date of the accident \u2014 we\u2019ve noted your confirmation. To move your claim forward, we\u2019ll need the finance agreement. If you\u2019re unable to provide it right away, let us know, and we\u2019ll follow up when you\u2019re ready.  \n\nI\u2019ve noted your question about contacting your lender directly, and a team member will reach out to address that.  \n\nThanks for your patience, and feel free to reply with any updates!  \n\nBest,",
+    "reason": "missing required document(s): finance_agreement"
+  },
+  "pending_customer_questions": [
+    "can you contact my lender directly?"
+  ],
+  "tools_used": [
+    {
+      "tool": "parse_customer_reply",
+      "reason": "The customer reply exists but hasn't been parsed yet, which may provide information needed to resolve missing documents or conflicts.",
+      "result": "extracted fields: ['lender_name']; customer confirmed: ['date_of_loss']; questions: 1"
+    },
+    {
+      "tool": "draft_customer_message",
+      "reason": "The current action is 'message_customer' and a message has not been drafted yet this turn.",
+      "result": "drafted 76 word message"
+    },
+    {
+      "tool": "done",
+      "reason": "The customer message was already drafted, and no further actions are needed for the current state.",
+      "result": "agent ended loop"
+    }
+  ],
+  "turn_history": []
+}

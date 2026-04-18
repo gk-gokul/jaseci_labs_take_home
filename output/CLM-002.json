@@ -1,0 +1,91 @@
+{
+  "claim_id": "CLM-002",
+  "status": "incomplete",
+  "extracted_fields": {
+    "vin": {
+      "value": "3FADP4BJ7EM207685",
+      "confidence": "high",
+      "source": "finance_agreement.pdf",
+      "reason": "2 authoritative source(s) agree (total sources: 3)"
+    },
+    "date_of_loss": {
+      "value": "2026-01-28",
+      "confidence": "medium",
+      "source": "settlement_breakdown.png",
+      "reason": "1 authoritative source(s) agree (total sources: 2)"
+    },
+    "insurance_payout": {
+      "value": 12400.0,
+      "confidence": "medium",
+      "source": "settlement_breakdown.png",
+      "reason": "1 authoritative source(s) agree (total sources: 1)"
+    },
+    "loan_balance": {
+      "value": 15890.2,
+      "confidence": "high",
+      "source": "finance_agreement.pdf",
+      "reason": "2 authoritative source(s) agree (total sources: 2)"
+    }
+  },
+  "documents": {
+    "identified": [
+      {
+        "file": "customer_reply.txt",
+        "type": "customer_reply",
+        "authority": "customer_reply"
+      },
+      {
+        "file": "finance_agreement.pdf",
+        "type": "finance_agreement",
+        "authority": "authoritative"
+      },
+      {
+        "file": "settlement_breakdown.png",
+        "type": "settlement_breakdown",
+        "authority": "authoritative"
+      }
+    ],
+    "missing": [
+      "police_report"
+    ],
+    "duplicates": [],
+    "superseded": []
+  },
+  "issues": [
+    {
+      "type": "missing",
+      "description": "required document not provided: police_report"
+    },
+    {
+      "type": "pending",
+      "description": "customer has promised to send police_report",
+      "details": "customer will send by next weekend"
+    }
+  ],
+  "next_action": {
+    "type": "message_customer",
+    "message": "Hi James,  \n\nThanks for sharing the details about your claim AUT-5513827. We\u2019ve noted that the police report is on its way by next weekend\u2014no rush, we\u2019ll hold off until you send it.  \n\nI\u2019ve also noted your question about whether documentation is needed for that item. A team member will follow up shortly.  \n\nLet me know if you need anything else. Thanks!",
+    "reason": "missing required document(s): police_report"
+  },
+  "pending_customer_questions": [
+    "is that something you need documentation for too?"
+  ],
+  "tools_used": [
+    {
+      "tool": "parse_customer_reply",
+      "reason": "The customer reply document exists but has not been parsed, which may provide information needed to resolve the missing police report issue.",
+      "result": "extracted fields: ['vin', 'date_of_loss']; questions: 1; promised docs: ['police_report']"
+    },
+    {
+      "tool": "draft_customer_message",
+      "reason": "The current action is 'message_customer' and a message has not been drafted this turn.",
+      "result": "drafted 61 word message"
+    },
+    {
+      "tool": "done",
+      "reason": "The message has already been drafted, and no further actions are required for the current state.",
+      "result": "agent ended loop"
+    }
+  ],
+  "turn_history": []
+}

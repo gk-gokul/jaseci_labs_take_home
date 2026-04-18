@@ -1,0 +1,89 @@
+{
+  "claim_id": "CLM-004",
+  "status": "needs_review",
+  "extracted_fields": {
+    "vin": {
+      "value": "5YJ3E1EA7K",
+      "confidence": "high",
+      "source": "finance_agreement.png",
+      "reason": "3 authoritative source(s) agree (total sources: 4) | format check failed: length 10, expected 17"
+    },
+    "date_of_loss": {
+      "value": "2025-12-19",
+      "confidence": "high",
+      "source": "police_report.png",
+      "reason": "2 authoritative source(s) agree (total sources: 3)"
+    },
+    "insurance_payout": {
+      "value": null,
+      "confidence": "n/a",
+      "source": null,
+      "reason": "settlement breakdown shows pending/tbd value"
+    },
+    "loan_balance": {
+      "value": 19200.0,
+      "confidence": "high",
+      "source": "finance_agreement.png",
+      "reason": "2 authoritative source(s) agree (total sources: 2)"
+    }
+  },
+  "documents": {
+    "identified": [
+      {
+        "file": "finance_agreement.png",
+        "type": "finance_agreement",
+        "authority": "authoritative"
+      },
+      {
+        "file": "police_report.png",
+        "type": "police_report",
+        "authority": "authoritative"
+      },
+      {
+        "file": "settlement_breakdown.png",
+        "type": "settlement_breakdown",
+        "authority": "authoritative"
+      },
+      {
+        "file": "tow_receipt.png",
+        "type": "tow_receipt",
+        "authority": "supporting"
+      }
+    ],
+    "missing": [],
+    "duplicates": [],
+    "superseded": []
+  },
+  "issues": [
+    {
+      "type": "invalid",
+      "description": "vin format check failed: length 10, expected 17",
+      "details": "value: 5YJ3E1EA7K",
+      "field": "vin"
+    },
+    {
+      "type": "pending",
+      "description": "insurance payout is pending on the settlement breakdown",
+      "field": "insurance_payout"
+    }
+  ],
+  "next_action": {
+    "type": "message_customer",
+    "message": "Hi Marcus,  \n\nWe\u2019re reviewing your claim AUT-3347821 and noticed your VIN is incomplete. The full 17-character VIN can be found on your vehicle registration or the driver-side door jamb. Once you share the correct VIN, we\u2019ll proceed promptly.  \n\nAdditionally, the insurance payout amount is still pending and will be finalized soon\u2014no action is needed from you.  \n\nThanks for your patience!  \nBest,",
+    "reason": "invalid field(s) require human review: ['vin']"
+  },
+  "pending_customer_questions": [],
+  "tools_used": [
+    {
+      "tool": "draft_customer_message",
+      "reason": "The current action is 'message_customer' and a message has not been drafted this turn.",
+      "result": "drafted 61 word message"
+    },
+    {
+      "tool": "done",
+      "reason": "The message was already drafted, and no further actions are required for the current state.",
+      "result": "agent ended loop"
+    }
+  ],
+  "turn_history": []
+}
