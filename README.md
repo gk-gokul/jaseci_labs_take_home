@@ -1,22 +1,43 @@
 # AI Claims Processing Agent
 
-A local-first, agent-driven system for processing total-loss vehicle insurance claims. Reads a claim folder of mixed documents (PDFs, scanned images, customer emails), extracts key fields, reconciles conflicts across sources, decides what to do next, and talks to the customer when needed.
+This is my submission for the take-home assignment. It's a Python agent that reads a folder of claim documents, pulls out the important fields, checks if everything makes sense, decides what to do next, and writes a message to the customer if needed.
 
-Built end-to-end on open-source models running locally via Ollama — no external APIs, no paid model calls.
+The whole thing runs locally with open-source models through Ollama. No paid APIs.
+
+---
+
+## Quick answer to the requirements
+
+Going through the assignment checklist to show what's covered.
+
+| Requirement | Where it lives |
+|---|---|
+| 1. Document intake (PDFs, images, text) | `ingest_1.py` handles all three |
+| 2. Field extraction with confidence + reason | `tools_3.py` consolidates, `output_format.py` serializes |
+| 3. Cross-document consistency + educated guess | `consolidate_field` in `tools_3.py` |
+| 3. Duplicate handling | `reconcile_same_type_docs` in `tools_3.py` |
+| 4. Status decision (complete / incomplete / needs_review) | `decide_status` in `tools_3.py` |
+| 5. Multi-turn processing | `replies_5.py` parses reply, `agent.py` re-runs tools |
+| 6. Interactive mode | Option 3 in `main.py` menu |
+| 7. Conditional tool usage | `agent.py` — LLM picks next tool each iteration |
+| 8. Claim prioritization | `prioritize` in `main.py` |
+| 9. Output format | `output_format.py` produces the exact schema |
+| Open-source LLM bonus | qwen2.5vl and qwen3:8b via Ollama |
+| AI usage logs | `ai_usage/` folder |
 
 ---
 
 ## How to run
 
-### Prerequisites
-- Python 3.10+
-- [Ollama](https://ollama.ai) running locally
-- Models pulled:
+### Before you start
+- Python 3.10 or newer
+- [Ollama](https://ollama.ai) installed and running
+- Pull the two models:
   ```
   ollama pull qwen2.5vl:latest
   ollama pull qwen3:8b
   ```
-- Python dependencies:
+- Install the Python packages:
   ```
   pip install requests pypdf
   ```
@@ -24,9 +45,10 @@ Built end-to-end on open-source models running locally via Ollama — no externa
 ### Folder layout
 ```
 project/
-├── claims/              # input — CLM-001 ... CLM-005 folders
-├── cache/               # auto-created, OCR extractions
-├── output/              # auto-created, final JSON per claim
+├── claims/              # the 5 input folders go here
+├── cache/               # made automatically (OCR results)
+├── output/              # made automatically (final JSON per claim)
+├── ai_usage/            # chat logs with Claude
 ├── ingest_1.py
 ├── state_2.py
 ├── tools_3.py
@@ -34,25 +56,28 @@ project/
 ├── replies_5.py
 ├── agent.py
 ├── output_format.py
-└── main.py
+├── main.py
+└── README.md
 ```
 
-### Step 1: Ingest (slow, one-time)
-Runs OCR + field extraction on every document in every claim. Results are cached by file hash, so re-runs are instant.
+### Step 1 — run the ingestion (slow, only needed once)
+
+This reads every document in every claim folder and extracts fields. Results are saved to `cache/` so you never have to re-run this unless documents change.
 
 ```
 python ingest_1.py all        # all 5 claims
-python ingest_1.py CLM-001    # one claim
+python ingest_1.py CLM-001    # just one
 ```
 
-Takes roughly 15–20 minutes first time (vision OCR is ~1 min per image). Subsequent runs skip cached files automatically.
+First run takes about 15–20 minutes because vision OCR is about one minute per image. After that, it's instant because of caching.
 
-### Step 2: Run the agent
+### Step 2 — run the agent
+
 ```
 python main.py
 ```
 
-You'll see a menu:
+You'll get a menu:
 ```
 1. Batch mode       — process all 5 claims, print prioritization
 2. Single claim     — process one claim
@@ -60,68 +85,70 @@ You'll see a menu:
 4. Quit
 ```
 
-- **Batch mode** writes one JSON per claim to `output/` and prints the prioritization order.
-- **Single claim** processes one claim.
-- **Interactive chat** lets you play the customer. Pick a claim, the agent sends its first message, you reply, the agent responds. Type `quit` to exit.
+- **Batch mode** runs all 5 claims, writes `output/CLM-00X.json` for each, and prints the processing order.
+- **Single claim** does one claim at a time.
+- **Interactive chat** lets you play the customer. Pick a claim, the agent sends its first message, you type a reply, the agent responds. Type `quit` to exit.
 
 ---
 
-## Approach and architecture
+## My approach
 
-### Two-stage design
+### The big idea
 
-The system is deliberately split into a slow ingestion stage (runs once, cached) and a fast agent stage (runs many times, reasons over cached data).
+The system has two stages. The first stage is slow and runs once. The second stage is fast and is where the agent actually thinks.
 
 ```
-┌─────────────────┐      ┌──────────────────────────────────┐
-│  Ingestion      │      │  Agent reasoning                 │
-│  (slow, once)   │ ───▶ │  (fast, LLM-driven)              │
-│                 │      │                                  │
-│  PDFs → pypdf   │      │  load cached extractions         │
-│  Images → VLM   │      │  reconcile + consolidate         │
-│  Texts → LLM    │      │  agent loop picks tools          │
-│                 │      │  (parse reply / draft / escalate) │
-│  → cache/*.json │      │  → output/*.json                 │
-└─────────────────┘      └──────────────────────────────────┘
+┌──────────────────┐       ┌────────────────────────────────┐
+│  STAGE 1          │       │  STAGE 2                        │
+│  Ingestion        │  ──▶ │  Agent reasoning                │
+│  (slow, cached)   │       │  (fast, LLM picks tools)       │
+│                   │       │                                 │
+│  PDFs → pypdf     │       │  load cached fields             │
+│  Images → VLM     │       │  reconcile, consolidate         │
+│  Text → LLM       │       │  agent loop picks next tool     │
+│  → cache/*.json   │       │  → output/*.json                │
+└──────────────────┘       └────────────────────────────────┘
 ```
 
-Why this split:
-- Vision OCR is ~1 minute per image. Without caching, every agent iteration or prompt change forces re-extraction. Unusable.
-- Interactive mode stays responsive because the agent never touches images directly — just cached JSON.
-- Development iteration goes from minutes to seconds.
+Why split it this way? Vision OCR on scanned images takes about a minute each. If every agent run re-did OCR, testing and iterating would take forever. Caching by file hash means the slow part only happens once, and the agent loop stays responsive.
 
-### File-by-file responsibilities
+### Files and what they do
 
-| File | Purpose |
+| File | What it does |
 |---|---|
-| `ingest_1.py` | Extracts fields from PDFs (pypdf), images (qwen2.5vl), and text files (qwen3). Hashes and caches per file. |
-| `state_2.py` | The claim state data model as plain dicts. Constants for authority mappings and required document types. |
-| `tools_3.py` | Deterministic processing tools: load from cache, consolidate fields across documents, resolve conflicts, validate VINs, decide status. |
-| `messages_4.py` | Customer message drafter (qwen3). Takes a structured brief, writes a warm, specific email. |
-| `replies_5.py` | Customer reply parser (qwen3). Extracts provided values, confirmed conflicts, questions, and promised documents from free-form email text. Merges parsed results back into state. |
-| `agent.py` | The agent loop. Wraps tools in a registry with descriptions. Calls qwen3 to pick the next tool based on state, runs it, logs to `tools_used`, repeats until `done`. |
-| `output_format.py` | Serializes internal state to the README's expected output schema. |
-| `main.py` | Launcher menu: batch, single claim, or interactive chat. |
+| `ingest_1.py` | Reads every file in a claim folder. PDFs use `pypdf` for text, images use `qwen2.5vl`, text files use `qwen3`. Saves extraction as JSON in `cache/`. |
+| `state_2.py` | The data model. Plain Python dicts. Holds constants like required document types and authority rankings. |
+| `tools_3.py` | All the deterministic logic. Loading cached data, validating VINs, resolving conflicts across documents, deciding status, etc. |
+| `messages_4.py` | Writes the email to the customer. Uses qwen3 with a structured input brief so the message stays grounded. |
+| `replies_5.py` | Reads a customer reply (email) and pulls out what they provided, what conflicts they confirmed, and what questions they asked. |
+| `agent.py` | The agent loop. Has a tool registry. Asks qwen3 which tool to call next, runs it, repeats until the agent says `done`. |
+| `output_format.py` | Turns the internal state into the output schema shown in the assignment. |
+| `main.py` | The menu that launches batch, single claim, or interactive mode. |
 
-### The agent loop
+### The agent loop — how tool selection works at runtime
 
-This is the part that satisfies the "agent decides at runtime" requirement directly.
+This is the part that makes this an agent and not just a pipeline.
 
-The agent sees a compact state summary and a tool registry with descriptions. On each iteration it returns `{"tool": "name", "reason": "..."}` and the loop executes that tool. Termination is when the agent picks `done`, with a max of 6 iterations as a safety rail.
+Each turn, the agent sees:
+1. A summary of the current claim state (what's missing, what's invalid, what conflicts exist, whether a reply is waiting)
+2. The list of tools it can call, each with a description of when to use it
+3. Which tools have already been called this run
 
-Five tools are registered:
+It returns a single JSON: `{"tool": "tool_name", "reason": "why I picked this"}`. The loop runs that tool, logs it, and asks the agent again. Stops when the agent picks `done` (or after 6 iterations, which is a safety cap).
 
-| Tool | When the agent should pick it |
+The five tools in the registry:
+
+| Tool | Picked when |
 |---|---|
-| `parse_customer_reply` | A customer reply exists and hasn't been parsed yet |
-| `draft_customer_message` | Action is `message_customer` and no message has been drafted since the last reply |
-| `escalate_to_human` | Action is `escalate` (conflict the customer can't resolve) |
-| `finalize_claim` | Status is `complete` |
+| `parse_customer_reply` | A customer reply exists and hasn't been read yet |
+| `draft_customer_message` | Action is `message_customer` and no message written yet |
+| `escalate_to_human` | Action is `escalate` — the customer can't fix this |
+| `finalize_claim` | Status is `complete` — ready to pay out |
 | `done` | Nothing more to do |
 
-The payoff is that every claim produces a **different tool sequence**, visible in the output JSON's `tools_used` field:
+The proof that the agent is actually deciding: every claim produces a **different tool trace**.
 
-| Claim | Tool trace |
+| Claim | Tools picked |
 |---|---|
 | CLM-001 | `finalize_claim → done` |
 | CLM-002 | `parse_customer_reply → draft_customer_message → done` |
@@ -129,175 +156,234 @@ The payoff is that every claim produces a **different tool sequence**, visible i
 | CLM-004 | `draft_customer_message → done` |
 | CLM-005 | `parse_customer_reply → draft_customer_message → done` |
 
-Same code, five different runtime decisions based on state content.
+Same code, different decisions based on what each state actually looks like. Each decision is logged with the agent's reasoning in the `tools_used` field of the output JSON.
 
 ---
 
-## Tool design rationale
+## Tool design — what I built and why
 
-### What stays deterministic, what uses the LLM
+### Rule I followed
 
-**Rule of thumb: if a regex or dict lookup can do it, don't burn LLM tokens.**
+If plain Python can do it, don't use an LLM. If it needs judgment or has to read noisy text, use an LLM.
 
-Deterministic (plain Python, no model calls):
-- VIN format check — 17 alphanumeric characters, excludes I/O/Q
-- Date normalization across formats (`02/14/2026` ↔ `2026-02-14`)
-- Numeric comparison with rounding tolerance
-- Cross-document field consolidation with majority vote + authority weighting
-- Revision detection via keyword flags (`REVISED`, `SUPERSEDES`)
-- Status decision tree
-- File hashing for cache lookups
+### Deterministic (plain Python, no model calls)
 
-LLM-driven:
-- Document classification from images (qwen2.5vl)
-- Field extraction from noisy scans, including strikethrough handling (qwen2.5vl)
-- Free-form customer email parsing — extracting fields, questions, and promises from prose (qwen3)
-- Customer message drafting with tone and context (qwen3)
-- Tool selection at runtime (qwen3)
+- VIN format check (regex, 17 alphanumeric, no I/O/Q)
+- Date normalization so `02/14/2026` and `2026-02-14` compare as equal
+- Numeric comparison with a small tolerance for rounding
+- Consolidating a field across multiple documents (majority vote + authority weighting)
+- Detecting a revised version of a document via keywords like `REVISED` and `SUPERSEDES`
+- Deciding the claim status from the state
+- Hashing files for cache lookups
 
-### What the tool registry enables
+### LLM-driven (qwen2.5vl or qwen3)
 
-Each tool is a Python function plus a description. The agent's job is just to pick a name — tools read everything they need from the state themselves. This keeps the agent's reasoning simple (closed enum of tool names, no arguments to hallucinate) and makes every tool independently testable.
+- Classifying and extracting fields from scanned images
+- Reading a free-form customer email and pulling out structured info
+- Writing the customer-facing email
+- Picking which tool to run next in the agent loop
 
-### Things considered but deliberately skipped
+### Things I thought about but didn't build
 
-- **Fuzzy document deduplication.** File hash comparison handles exact duplicates. Near-duplicates are handled separately via revision markers (`REVISED`, `SUPERSEDES`). Semantic dedup would be overkill for 5 claims.
-- **Tesseract OCR fallback.** I tested qwen2.5vl on all the hard cases (strikethrough VINs, redaction blobs, rotated scans). It handled them correctly. A fallback chain would be belt-and-suspenders that never fires.
-- **Direct lender contact API.** CLM-005's Elena offers to authorize direct contact with Bank of America. In production this would trigger a lender API call. For this exercise, the system captures it as a pending question for a human reviewer.
-- **Police record lookup service.** CLM-002's James mentions officer badge numbers that a real system could use to pull the report. Out of scope — captured as a promised document instead.
-- **GAP insurance policy logic.** CLM-002's GAP question is a policy question, not a document question. Escalated to a human, per the drafter's authority rule (no policy commitments).
-- **Automatic re-ingestion on live attachments.** Interactive mode handles "I'm attaching it now" by marking the document as promised but can't actually receive the file. A production version would hook into an attachment upload flow.
+- **Fuzzy duplicate detection.** File hash catches exact duplicates. Revisions are caught via banner keywords. Semantic dedup isn't needed for 5 claims.
+- **Tesseract OCR as a backup.** I tested qwen2.5vl on all the messy cases (strikethroughs, redaction blobs, truncated VINs) and it handled them. A fallback that never fires is just extra code.
+- **Direct lender API for CLM-005.** Elena offers to authorize a direct call to Bank of America. In production this would trigger a lender API call. Out of scope here — I capture it as a pending question.
+- **Police records lookup for CLM-002.** James gives us the officer's name and badge number. A real system could pull the report that way. Marked as future work.
+- **Answering GAP insurance questions.** The drafter refuses to make policy commitments. Unknown questions always get "a team member will follow up."
+- **Automatic re-ingestion during interactive chat.** If the customer says "I'm attaching it now," the system acknowledges the promise but doesn't actually receive a file. Production would watch the folder for new files.
 
-### Key design decisions
+### Key design decisions (the ones I'd defend in the interview)
 
-**1. Field-specific authority ordering.**
-Different fields trust different sources:
+**1. Each field has its own authority order.**
+
+Different documents are trustworthy for different things:
 ```python
-"vin":           ["police_report", "settlement_breakdown", "finance_agreement"]
-"date_of_loss":  ["police_report", "settlement_breakdown", "finance_agreement"]
+"vin":             ["police_report", "settlement_breakdown", "finance_agreement"]
+"date_of_loss":    ["police_report", "settlement_breakdown", "finance_agreement"]
 "insurance_payout": ["settlement_breakdown"]
-"loan_balance":  ["finance_agreement", "settlement_breakdown"]
+"loan_balance":    ["finance_agreement", "settlement_breakdown"]
 ```
-Police reports are authoritative for dates (officer was physically present). Finance agreements are authoritative for loan balances (contract document). Settlements are the only source for payouts. VIN ordering puts settlement above finance because finance agreements are typed by lenders and prone to data-entry typos (this actually resolved CLM-003 correctly).
 
-**2. Format-valid-first VIN candidate filter.**
-When authoritative sources disagree on a VIN, filter to format-valid candidates before ranking. Without this, the system could confidently pick a malformed VIN just because it came from a high-authority source. On CLM-003, this skipped the police report's OCR-corrupted 16-char VIN in favor of the settlement's valid 17-char VIN.
+The police report is most trusted for dates because an officer was physically there. The finance agreement is most trusted for loan balance because it's the actual contract. The settlement is the only source for payouts. One global authority ranking would get this wrong.
+
+**2. For VINs, I filter to valid-format candidates before ranking.**
+
+If an authoritative source gives us a malformed VIN (OCR error), trusting it just because of source authority is wrong. I filter out format-invalid candidates first, then pick by authority among what's left. Without this, CLM-003 would have picked the police report's OCR-corrupted 16-character VIN over the settlement's clean 17-character one.
 
 **3. Three tiers of document authority, not two.**
+
 - `authoritative` — police report, finance agreement, settlement breakdown
 - `supporting` — adjuster note, tow receipt
 - `customer_reply` — customer emails
 
-Supporting and customer-reply sources appear in the `sources` list for transparency but are filtered out of value-matching when authoritative sources exist. This stops Elena's rough `$35,000` estimate from overriding the settlement's precise `$35,120.75`.
+Supporting and customer-reply sources show up in the sources list so you can see what was reported, but they get filtered out when authoritative sources exist. This is what stops Elena's rough "around $35,000" estimate from overriding the settlement's precise $35,120.75.
 
 **4. Consistency and validity are checked independently.**
-Three documents agreeing on the same invalid VIN is still invalid. CLM-004 is the test case: all four documents report `5YJ3E1EA7K` (10 chars). The cross-check passes ("consistent"), the validator catches it ("invalid"). Both run.
 
-**5. Source-kind overrides model classification when deterministic signals exist.**
-The VLM initially classified CLM-005's customer email as a `finance_agreement` based on its structured content (lender name, account number, monthly payment). `.txt` files are never finance agreements — we force `document_type: customer_reply` at ingest. Deterministic filesystem signals beat probabilistic model inference.
+Three documents agreeing on the same wrong VIN is still wrong. CLM-004 is the test: all four docs say `5YJ3E1EA7K` (10 chars). The cross-check says "consistent," the validator says "invalid." Both run. Status becomes `needs_review`.
 
-**6. Customer-confirmed conflicts bump confidence, not just resolution.**
-When Elena explicitly confirmed `03/22/2026` in her reply to a date conflict, the system upgrades the field confidence to `high` and tags the issue with `customer_confirmed: true`. The drafter then thanks her for catching it instead of re-asking.
+**5. File extension beats model classification.**
+
+The vision model once classified a customer email as a `finance_agreement` because it listed lender name, account number, and monthly payment — which looked like a finance agreement to the model. But `.txt` files are never finance agreements. I force `customer_reply` at the ingest step for all `.txt` files. Deterministic signals from the filesystem beat probabilistic guesses from the model.
+
+**6. Customer confirmations bump confidence.**
+
+When Elena in CLM-005 confirmed the date should be March 22 (not March 28 like our settlement said), the system:
+- Tagged the issue with `customer_confirmed: true`
+- Raised the field confidence to `high` because we now have 3 independent sources agreeing
+- Told the drafter to thank her instead of re-asking
 
 **7. A reply is not a resolution.**
-Status can only advance when the original blocker is resolved. Both CLM-002 and CLM-005 stay `incomplete` after parsing their customer replies because the missing document is still missing — the reply added context but didn't close the blocker.
 
-**8. The drafter has a strict authority rule.**
-The drafter can request documents, acknowledge what was provided, and note pending items. It cannot commit to policy decisions, promise third-party contact, or answer coverage questions. Unknown questions get "I've noted your question and a team member will follow up" — always, no exceptions. This is encoded in the prompt.
+Just because the customer replied doesn't mean the claim can move forward. The missing document is still missing. Both CLM-002 and CLM-005 stay `incomplete` after their replies because the blocker (missing police report, missing finance agreement) is still there. The reply adds context, not closure.
+
+**8. The drafter has an authority rule.**
+
+The drafter can ask for documents, acknowledge what was provided, and flag pending items. It cannot commit to policies, promise to contact third parties, or answer coverage questions. Any question outside its scope gets: "I've noted your question and a team member will follow up." No exceptions. This is enforced in the prompt.
 
 ---
 
 ## Model choices
 
-- **qwen2.5vl:latest** for image OCR and structured field extraction. Tested on all hard cases: strikethrough VIN corrections, partial redaction blobs, rotated scans, truncated VINs. Handles each correctly with one-shot structured JSON output.
-- **qwen3:8b** for everything text-only: parsing customer replies, drafting messages, and tool selection. Fast, good at structured output, supports tool-calling style reasoning.
+- **qwen2.5vl:latest** for image OCR and field extraction from scanned documents. Tested on all the hard cases (strikethrough VIN corrections, partial redaction blobs, truncated VINs). Returns clean JSON.
+- **qwen3:8b** for everything text-only: parsing customer emails, writing customer messages, and picking tools in the agent loop.
 
-Both run locally via Ollama. No external API dependencies.
+Both run locally via Ollama. No paid API calls anywhere.
+
+**Note:** this is a test submission, so I used local open-source models to keep it self-contained and reproducible. A production version could swap in a larger model if quality demanded it, with no architecture changes.
 
 ---
 
-## Handling the five test claims
+## The five test claims and what happened
 
-| Claim | Failure mode | Expected status | Tool trace |
+| Claim | What makes it tricky | Final status | Tools the agent picked |
 |---|---|---|---|
-| CLM-001 | Clean case; adjuster note has strikethrough VIN | `complete` | `finalize → done` |
-| CLM-002 | Police report missing; customer reply promises it, asks GAP question | `incomplete` | `parse → draft → done` |
-| CLM-003 | VIN mismatch across docs; two settlement PDFs with v2 superseding v1 | `needs_review` | `escalate → done` |
-| CLM-004 | Invalid VIN (10 chars); redaction blob on police report; pending ACV | `needs_review` | `draft → done` |
-| CLM-005 | Missing finance agreement; date mismatch; customer corrects date + offers lender authorization | `incomplete` | `parse → draft → done` |
+| CLM-001 | Clean case; adjuster note has a strikethrough VIN | `complete` | `finalize → done` |
+| CLM-002 | Police report missing; customer reply promises it and asks a GAP question | `incomplete` | `parse → draft → done` |
+| CLM-003 | VIN mismatch across docs; two settlement PDFs, v2 supersedes v1 | `needs_review` | `escalate → done` |
+| CLM-004 | VIN is only 10 characters; settlement has pending ACV; police report has a redaction | `needs_review` | `draft → done` |
+| CLM-005 | Finance agreement missing; date conflict; customer corrects date and offers lender authorization | `incomplete` | `parse → draft → done` |
 
-Each claim isolates a different class of problem — missing documents, invalid fields, cross-doc conflicts, document supersession, multi-turn context, customer-originated corrections. All five produce correct outputs.
-
----
-
-## Prioritization
-
-Prioritization ranks claims by who's blocking and how quickly the claim can close.
-
-Primary rank (action type):
-1. `finalize` — ready to pay, no human or customer input needed
-2. `escalate` — quick human review with a clear recommendation
-3. `message_customer` — waiting on external input
-
-Secondary rank (within `message_customer`):
-- Needs fresh outreach → ranked ahead of already-acknowledged
-- Waiting on internal appraisal → ranked last (out of our control)
-
-For the 5 test claims:
-1. **CLM-001** (`complete`) — finalize immediately
-2. **CLM-003** (`needs_review`) — human reviewer, VIN recommendation ready
-3. **CLM-005** (`incomplete`) — waiting on fresh customer outreach
-4. **CLM-002** (`incomplete`) — customer already engaged, document promised
-5. **CLM-004** (`needs_review`) — waiting on internal appraisal, slowest to close
+Each claim stresses a different class of problem — missing document, invalid field, cross-doc conflict, document supersession, customer correction — and each produces sensible output.
 
 ---
 
-## What I'd build with more time
+## Claim prioritization (my reasoning)
 
-**Attachment handling in interactive mode.**
-Currently "I'm attaching the police report now" marks the document as promised but doesn't actually ingest anything. A real version would watch the claim folder for new files and trigger re-ingestion mid-conversation.
+I ranked claims by who's blocking next and how fast each can close.
 
-**A lender API adapter for CLM-005's Elena scenario.**
-She offered to authorize direct contact with Bank of America. A production system would have a `request_lender_payoff` tool that integrates with a secure lending API, triggered when the customer provides written authorization.
+Primary order by action type:
+1. `finalize` — ready to pay, no one is blocking
+2. `escalate` — quick human decision with a clear recommendation
+3. `message_customer` — waiting on someone external
 
-**A police records lookup tool for CLM-002's James scenario.**
-He provided the officer name and badge number. A production system could query a records API to fetch the report directly, reducing customer friction.
+Tie-breakers inside `message_customer`:
+- Needs fresh outreach > already-acknowledged
+- Waiting on internal appraisal goes last (out of our control)
+
+My recommended order:
+
+1. **CLM-001** (complete) — pay it now, no effort needed
+2. **CLM-003** (needs_review) — reviewer just has to approve the VIN recommendation
+3. **CLM-005** (incomplete) — customer needs a fresh follow-up
+4. **CLM-002** (incomplete) — customer has already promised the document, just wait
+5. **CLM-004** (needs_review) — waiting on our own appraisal, slowest to close
+
+Output is also written to `output/_processing_order.json`.
+
+---
+
+## Output format
+
+Every claim writes a JSON to `output/CLM-00X.json` that matches the schema in the assignment. An example from CLM-001:
+
+```json
+{
+  "claim_id": "CLM-001",
+  "status": "complete",
+  "extracted_fields": {
+    "vin": {
+      "value": "1HGCM82633A004352",
+      "confidence": "high",
+      "source": "finance_agreement.png",
+      "reason": "3 authoritative source(s) agree (total sources: 4)"
+    },
+    "date_of_loss": { "..." },
+    "insurance_payout": { "..." },
+    "loan_balance": { "..." }
+  },
+  "documents": {
+    "identified": [ ... ],
+    "missing": [],
+    "duplicates": []
+  },
+  "issues": [],
+  "next_action": {
+    "type": "finalize",
+    "message": null,
+    "reason": "all required documents present and all fields resolved"
+  },
+  "tools_used": [
+    {"tool": "finalize_claim", "reason": "...", "result": "claim marked ready to finalize"},
+    {"tool": "done", "reason": "...", "result": "agent ended loop"}
+  ]
+}
+```
+
+See `output/` after running batch mode for all 5 full examples.
+
+---
+
+## What I'd do with more time
+
+**Live attachment handling in interactive mode.**
+Right now when the customer says "I'm attaching it now," the agent marks the document as promised but can't actually receive it. A real version would watch the claim folder for new files and trigger re-ingestion mid-conversation.
+
+**A lender API adapter.**
+CLM-005 Elena offered written authorization to contact Bank of America. A production system would have a `request_lender_payoff` tool that calls a lender API when she authorizes it.
+
+**A police records lookup tool.**
+CLM-002 James gives us the officer's name and badge number. A real system could pull the report directly from the department, saving the customer from finding their copy.
 
 **Parallel OCR.**
-Ollama supports concurrent requests. Running image OCR in parallel would cut first-time ingestion from ~20 minutes to ~5.
+Ollama handles concurrent requests. Running image OCR in parallel could cut first-time ingestion from 20 minutes to 5.
 
-**Better classification for unlabeled attachments.**
-The VLM occasionally misclassifies supporting documents. A second pass with a text-only model reading the structured extraction could validate the classification.
+**A test harness.**
+Ground-truth expected outputs per claim and a diff-based test runner. Would let me iterate on prompts without manually eyeballing JSON files.
 
-**Persistent turn history across sessions.**
-Currently the agent loses turn context when the process restarts. A production version would persist turn history to the claim state on disk so an adjuster can pick up where they left off.
+**Prompt-aware caching.**
+Right now cache is keyed by file hash only. If I change the extraction prompt, the cache still serves old extractions. Should include a prompt hash in the key.
 
-**An automated test harness.**
-Ground-truth expected outputs per claim and a diff-based test runner. Would let me iterate on prompts without manually reading 5 JSON files each time.
+**Persistent turn history.**
+Interactive sessions don't resume. A production version would save state so an adjuster can pick up a conversation later.
 
-**Batched field extraction prompts.**
-Currently one prompt per document. A claim-level prompt that looks at all documents together could resolve some cross-document ambiguities (like the CLM-003 VIN) before the consolidation step even runs.
+**Claim-level extraction.**
+Currently each document gets its own extraction call. A claim-level prompt that sees all documents together might resolve some ambiguities (like CLM-003's VIN) before consolidation even runs.
 
 ---
 
 ## Known limitations
 
-- **Occasional drafter optimism.** qwen3:8b occasionally commits to things it shouldn't ("we can contact your lender directly"). The authority rule in the prompt catches most of this but not all. A larger model or a validation pass would help.
-- **Parser hallucinations on unrelated content.** qwen3:8b sometimes pulls content across calls when asked for many output buckets. I mitigated this by dropping unused fields from the schema and adding explicit rules ("ONLY use information from the reply below"). Not perfect.
-- **No retry logic on malformed JSON.** If either qwen3 or qwen2.5vl returns invalid JSON, the parser logs the raw output and returns an error dict. Works for diagnosis; a production version would retry with clarifying prompts.
-- **Cache doesn't version extraction prompts.** If I change the extraction prompt, cached files still use the old extraction. Currently I delete the cache manually. Should hash the prompt alongside the file.
-- **Interactive mode is single-session.** State is saved on exit but not reloaded — each session starts fresh.
+- **Drafter occasionally gets optimistic.** qwen3:8b sometimes commits to things it shouldn't, like "we can contact your lender directly." The authority rule in the prompt catches most of it but not all. A larger model or a second validation pass would help.
+- **Parser sometimes mixes info across calls.** qwen3:8b occasionally pulls content from the brief into the parsed reply. I fixed the worst cases by simplifying the output schema and adding explicit rules, but not perfectly.
+- **No retry on bad JSON.** If either model returns broken JSON, we log it and return an error. A production version would retry with a clarifying prompt.
+- **Cache isn't prompt-versioned.** If I change an extraction prompt, cached files aren't invalidated. Manual `rm cache/...` needed.
+- **Interactive mode is single-session only.** State saves on exit but doesn't reload.
 
 ---
 
 ## How I used AI to build this
 
-I worked with Claude as a pair-programmer throughout. Logs are in `ai_usage/`. The back-and-forth covered:
+I worked with Claude throughout. Full logs are in `ai_usage/`. The important moments were:
 
-- Test-data analysis before coding — understanding what each claim was actually testing, which shaped the data model
-- OCR validation — testing qwen2.5vl against the hardest documents (strikethrough, redaction, truncated VINs) before committing to it
-- Architecture tradeoffs — pushed back on an overly-elaborate free-form agent loop in favor of a simpler tool-picker with a closed enum
-- Specific debugging — e.g., the CLM-003 VIN bug where the OCR-corrupted police report was confidently chosen as the answer. The fix was the format-valid-first filter.
-- Prompt iteration — each drafter and parser prompt went through 3–4 revisions based on actual outputs.
+- **Analyzing the test data before writing code.** We walked through each claim together to figure out what failure mode it was testing. That shaped the whole data model — specifically the three-tier authority system, the `customer_confirmed` flag, and the decision to track promised documents separately from missing ones.
 
-The decisions are mine. The code is mine. Claude was the sounding board and the fast typist.
+- **Testing qwen2.5vl before committing to it.** Before writing the ingestion pipeline, I ran the hardest documents through the model manually — the strikethrough VIN on CLM-001's adjuster note, the redaction blob on CLM-004's police report, the truncated VIN on CLM-004. It handled them all. That's why there's no Tesseract fallback.
+
+- **Pushing back on over-architecture.** Claude initially suggested a full free-form ReAct-style agent loop with a big tool registry. I pushed back — for 5 claims and 5 tools, a simpler tool-picker with a closed enum is more reliable and easier to defend in an interview. We landed on the current design.
+
+- **Catching a real bug on CLM-003.** The first version of the conflict resolver picked the police report's OCR-corrupted 16-character VIN as the recommended value, because police report had highest authority for VIN. Claude and I worked out that authority ranking shouldn't override format validity — you filter out invalid candidates first, then rank. That fix is in `consolidate_field`.
+
+- **Prompt iteration.** Every LLM prompt went through 3–4 rounds. The drafter prompt originally leaked VIN advice into emails where VINs weren't an issue. The parser originally hallucinated approximations from other claims. Both got tightened through test-and-fix cycles you can see in the logs.
+
+The architecture decisions and the hard calls are mine. Claude was my sounding board and a fast typist when I was already sure what I wanted.
