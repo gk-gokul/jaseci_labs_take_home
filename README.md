@@ -54,24 +54,26 @@ project/
 ├── tools_3.py
 ├── messages_4.py
 ├── replies_5.py
-├── agent.py
+├── agent_6.py
 ├── output_format.py
 ├── main.py
 └── README.md
 ```
 
-### Step 1 — run the ingestion (slow, only needed once)
+### Step 1 — ingestion (one-time, already done)
 
-This reads every document in every claim folder and extracts fields. Results are saved to `cache/` so you never have to re-run this unless documents change.
+The `cache/` folder in this submission already contains extraction results for all 5 claims. If you just want to see the system run, skip this step and go straight to Step 2.
+
+If you want to re-run ingestion from scratch (for example, if you change a document or delete the cache):
 
 ```
 python ingest_1.py all        # all 5 claims
 python ingest_1.py CLM-001    # just one
 ```
 
-First run takes about 15–20 minutes because vision OCR is about one minute per image. After that, it's instant because of caching.
+A full from-scratch run takes about 15–20 minutes because vision OCR is roughly one minute per scanned image. Subsequent runs are instant - the ingester hashes each file and skips anything that's already cached.
 
-### Step 2 — run the agent
+### Step 2 - run the agent
 
 ```
 python main.py
@@ -79,9 +81,9 @@ python main.py
 
 You'll get a menu:
 ```
-1. Batch mode       — process all 5 claims, print prioritization
-2. Single claim     — process one claim
-3. Interactive chat — live conversation with the agent
+1. Batch mode       - process all 5 claims, print prioritization
+2. Single claim     - process one claim
+3. Interactive chat - live conversation with the agent
 4. Quit
 ```
 
@@ -121,11 +123,11 @@ Why split it this way? Vision OCR on scanned images takes about a minute each. I
 | `tools_3.py` | All the deterministic logic. Loading cached data, validating VINs, resolving conflicts across documents, deciding status, etc. |
 | `messages_4.py` | Writes the email to the customer. Uses qwen3 with a structured input brief so the message stays grounded. |
 | `replies_5.py` | Reads a customer reply (email) and pulls out what they provided, what conflicts they confirmed, and what questions they asked. |
-| `agent.py` | The agent loop. Has a tool registry. Asks qwen3 which tool to call next, runs it, repeats until the agent says `done`. |
+| `agent_6.py` | The agent loop. Has a tool registry. Asks qwen3 which tool to call next, runs it, repeats until the agent says `done`. |
 | `output_format.py` | Turns the internal state into the output schema shown in the assignment. |
 | `main.py` | The menu that launches batch, single claim, or interactive mode. |
 
-### The agent loop — how tool selection works at runtime
+### The agent loop - how tool selection works at runtime
 
 This is the part that makes this an agent and not just a pipeline.
 
@@ -160,7 +162,7 @@ Same code, different decisions based on what each state actually looks like. Eac
 
 ---
 
-## Tool design — what I built and why
+## Tool design - what I built and why
 
 ### Rule I followed
 
@@ -192,7 +194,7 @@ If plain Python can do it, don't use an LLM. If it needs judgment or has to read
 - **Answering GAP insurance questions.** The drafter refuses to make policy commitments. Unknown questions always get "a team member will follow up."
 - **Automatic re-ingestion during interactive chat.** If the customer says "I'm attaching it now," the system acknowledges the promise but doesn't actually receive a file. Production would watch the folder for new files.
 
-### Key design decisions (the ones I'd defend in the interview)
+### Key design decisions 
 
 **1. Each field has its own authority order.**
 
@@ -212,9 +214,9 @@ If an authoritative source gives us a malformed VIN (OCR error), trusting it jus
 
 **3. Three tiers of document authority, not two.**
 
-- `authoritative` — police report, finance agreement, settlement breakdown
-- `supporting` — adjuster note, tow receipt
-- `customer_reply` — customer emails
+- `authoritative` - police report, finance agreement, settlement breakdown
+- `supporting` - adjuster note, tow receipt
+- `customer_reply` - customer emails
 
 Supporting and customer-reply sources show up in the sources list so you can see what was reported, but they get filtered out when authoritative sources exist. This is what stops Elena's rough "around $35,000" estimate from overriding the settlement's precise $35,120.75.
 
@@ -224,7 +226,7 @@ Three documents agreeing on the same wrong VIN is still wrong. CLM-004 is the te
 
 **5. File extension beats model classification.**
 
-The vision model once classified a customer email as a `finance_agreement` because it listed lender name, account number, and monthly payment — which looked like a finance agreement to the model. But `.txt` files are never finance agreements. I force `customer_reply` at the ingest step for all `.txt` files. Deterministic signals from the filesystem beat probabilistic guesses from the model.
+The vision model once classified a customer email as a `finance_agreement` because it listed lender name, account number, and monthly payment - which looked like a finance agreement to the model. But `.txt` files are never finance agreements. I force `customer_reply` at the ingest step for all `.txt` files. Deterministic signals from the filesystem beat probabilistic guesses from the model.
 
 **6. Customer confirmations bump confidence.**
 
@@ -250,8 +252,6 @@ The drafter can ask for documents, acknowledge what was provided, and flag pendi
 
 Both run locally via Ollama. No paid API calls anywhere.
 
-**Note:** this is a test submission, so I used local open-source models to keep it self-contained and reproducible. A production version could swap in a larger model if quality demanded it, with no architecture changes.
-
 ---
 
 ## The five test claims and what happened
@@ -273,9 +273,9 @@ Each claim stresses a different class of problem — missing document, invalid f
 I ranked claims by who's blocking next and how fast each can close.
 
 Primary order by action type:
-1. `finalize` — ready to pay, no one is blocking
-2. `escalate` — quick human decision with a clear recommendation
-3. `message_customer` — waiting on someone external
+1. `finalize` - ready to pay, no one is blocking
+2. `escalate` - quick human decision with a clear recommendation
+3. `message_customer` - waiting on someone external
 
 Tie-breakers inside `message_customer`:
 - Needs fresh outreach > already-acknowledged
@@ -283,11 +283,11 @@ Tie-breakers inside `message_customer`:
 
 My recommended order:
 
-1. **CLM-001** (complete) — pay it now, no effort needed
-2. **CLM-003** (needs_review) — reviewer just has to approve the VIN recommendation
-3. **CLM-005** (incomplete) — customer needs a fresh follow-up
-4. **CLM-002** (incomplete) — customer has already promised the document, just wait
-5. **CLM-004** (needs_review) — waiting on our own appraisal, slowest to close
+1. **CLM-001** (complete) - pay it now, no effort needed
+2. **CLM-003** (needs_review) - reviewer just has to approve the VIN recommendation
+3. **CLM-005** (incomplete) - customer needs a fresh follow-up
+4. **CLM-002** (incomplete) - customer has already promised the document, just wait
+5. **CLM-004** (needs_review) - waiting on our own appraisal, slowest to close
 
 Output is also written to `output/_processing_order.json`.
 
