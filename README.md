@@ -355,11 +355,11 @@ Currently each document gets its own extraction call. A claim-level prompt that 
 
 ## How I used AI
 
-I used Claude in a targeted way with small, task-specific prompts rather than long conversational threads. The full chat history is available here: [ai_usage/](https://claude.ai/share/9d336e0f-e4a1-46dc-8ab7-0a88f0ef61cd)
+I used Claude in a targeted way with small, task-specific prompts rather than long conversational threads. The full chat history is available here: [ai_usage/claude_chat](https://claude.ai/share/9d336e0f-e4a1-46dc-8ab7-0a88f0ef61cd)
 
 My approach was to define each module clearly (ingestion, state, tools, messaging, agent) and generate them with focused prompts that specified inputs, outputs, and constraints. Prompts were kept minimal and structured to return predictable outputs, usually in a single pass.
 
 I avoided large, open-ended prompts and instead broke the system into smaller components, which made it easier to control behavior and reduce iteration. Most prompts were designed to produce code or structured JSON directly, so there was little need for follow-up refinement.
 
 Claude was primarily used to accelerate implementation once the structure was clear. The overall architecture, data model, and decision logic were defined upfront and then implemented with targeted assistance.
-The architecture decisions and the hard calls are mine. Claude was my sounding board and a fast typist when I was already sure what I wanted.
+The architecture decisions and the hard calls are mine. 
